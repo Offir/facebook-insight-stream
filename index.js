@@ -6,6 +6,7 @@ var stream = require( 'stream' );
 var extend = require( 'extend' );
 var request = require( 'request' );
 var Promise = require( 'bluebird' );
+const moment = require( 'moment' )
 
 request = Promise.promisifyAll( request )
 
@@ -22,7 +23,8 @@ var NOT_SUPPORTED_CODE = 3001;
 var EDGEMAP = {
     page: 'insights',
     app: 'app_insights',
-    post: 'insights'
+    post: 'insights',
+    audience: 'adnetworkanalytics'
 }
 
 util.inherits( FacebookInsightStream, stream.Readable )
@@ -73,47 +75,21 @@ FacebookInsightStream.prototype._handleData = function ( data ) {
 
 FacebookInsightStream.prototype._init = function ( callback ) {
     var options = this.options;
+    let query = ''
 
-    // building url pattern for all the request
-    var until = Date.now();
-    var since = new Date();
-    since = since.setDate( since.getDate() - options.pastdays )
+    let path = [ BASEURL, '{id}', options.edge ]
 
-    // fb ask for timestamp in seconds
-    until = Math.round( until / 1000 );
-    since = Math.round( since / 1000 );
-
-    var path = [
-        BASEURL,
-        '{id}',
-        options.edge,
-        '{metric}',
-    ].join( '/' )
-
-    var hasEvents = options.events && options.events.length;
-    var breakdowns = options.breakdowns;
-
-    let queryObj = {
-        since: options.pastdays ? since : '',
-        until: until,
-        period: options.period,
-        access_token: options.token,
-        event_name: hasEvents ? '{ev}' : '',
-        aggregateBy: options.aggregate ? '{agg}' : ''
+    if ( options.edge !== 'adnetworkanalytics' ) {
+        query = buildGeneralQuery( options )
+        path = path.concat( '{metric}' )
+    } else {
+        query = buildAudienceQuery( options )
     }
-    // Build a query string from the object keys
-    let query = Object.keys(queryObj).map(key => {
-        return `${key}=${queryObj[key]}`
-    }).join('&')
 
-    if ( breakdowns && breakdowns.length ) {
-        for ( var i = 0; i < breakdowns.length; i += 1 ) {
-            query += `&breakdowns[${i}]=${breakdowns[i]}`
-        }
-    }
+    path = path.join('/')
 
     // this url is urlPattern shared by all the requests
-    // each request using thie pattern should replace the
+    // each request using the pattern should replace the
     // {id} and {metric} place holders with real values
     this.url = [ path, query ].join( '?' )
 
@@ -180,7 +156,7 @@ FacebookInsightStream.prototype._initItem = function ( item ) {
 }
 
 /* _collect will be called once for each metric, the insight api request
- * single api call for each metric, wich result in a list of values
+ * single api call for each metric, which result in a list of values
  * (value per day) so in attempt to create one table with all the metrics,
  * we are buffering each result in a key value map, with key for
  * each day in the collected time range, and appending each value
@@ -215,8 +191,6 @@ FacebookInsightStream.prototype._collect = function ( metrics, item, buffer, eve
         return data;
     }
 
-    // for the audience API, we just use one metric ['app_event']
-    // with a few events
     var _metric = metrics[ metrics.length -1 ] || options.metrics[ 0 ];
     var model = { id: item.id, metric: _metric }
 
@@ -380,4 +354,84 @@ function aggregationType ( ev ) {
         return 'COUNT'
     }
     return 'SUM';
+}
+
+/**
+ * Building url pattern for Facebook API requests
+ * @param options
+ * @returns {string}
+ */
+function buildGeneralQuery(options) {
+    let until = Date.now();
+    let since = new Date();
+    since = since.setDate( since.getDate() - options.pastdays )
+
+    // fb ask for timestamp in seconds
+    until = Math.round( until / 1000 );
+    since = Math.round( since / 1000 );
+
+    const hasEvents = options.events && options.events.length;
+    const breakdowns = options.breakdowns;
+
+    let queryObj = {
+        since: options.pastdays ? since : '',
+        until: until,
+        period: options.period,
+        access_token: options.token,
+        event_name: hasEvents ? '{ev}' : '',
+        aggregateBy: options.aggregate ? '{agg}' : ''
+    }
+    let query = buildQueryString(queryObj)
+
+    if ( breakdowns && breakdowns.length ) {
+        for ( var i = 0; i < breakdowns.length; i += 1 ) {
+            query += `&breakdowns[${i}]=${breakdowns[i]}`
+        }
+    }
+
+    return query
+}
+
+/**
+ * Building url pattern for Audience API requests
+ * @param options
+ * @returns {string}
+ */
+function buildAudienceQuery(options) {
+
+    const since = options.pastdays ? moment()
+        .subtract(options.pastdays, 'd')
+        .format('YYYY-MM-DD') : ''
+
+    const until = new Date().toISOString().split('T')[0]
+
+    let queryObj = {
+        since: since,
+        until: until,
+        period: options.period,
+        access_token: options.token,
+        aggregation_period: options.aggregate,
+        limit: options.limit
+    }
+
+    let query = 'metrics={metric}&'
+    query += buildQueryString(queryObj)
+
+    const breakdowns = options.breakdowns;
+    if ( breakdowns && breakdowns.length ) {
+        query += `&breakdowns=${breakdowns}`
+    }
+
+    return query
+}
+
+/**
+ * Build a query string from the object keys
+ * @param queryObj
+ * @returns {string}
+ */
+function buildQueryString(queryObj) {
+    return Object.keys(queryObj).map(key => {
+        return `${key}=${queryObj[key]}`
+    }).join('&')
 }
