@@ -5,7 +5,7 @@ var sugar = require( 'sugar' );
 var stream = require( 'stream' );
 var extend = require( 'extend' );
 var request = require( 'request' );
-var Promise = require( 'bluebird' );
+const Promise = require( 'bluebird' );
 const moment = require( 'moment' )
 
 request = Promise.promisifyAll( request )
