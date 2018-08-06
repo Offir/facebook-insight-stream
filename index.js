@@ -363,18 +363,16 @@ function aggregationType ( ev ) {
  */
 function buildGeneralQuery(options) {
     let until = Date.now();
-    let since = new Date();
-    since = since.setDate( since.getDate() - options.pastdays )
-
     // fb ask for timestamp in seconds
     until = Math.round( until / 1000 );
-    since = Math.round( since / 1000 );
+    const pastDays = options.pastdays
+    const since = pastDays ? getSince(pastDays) : ''
 
     const hasEvents = options.events && options.events.length;
     const breakdowns = options.breakdowns;
 
     let queryObj = {
-        since: options.pastdays ? since : '',
+        since: since,
         until: until,
         period: options.period,
         access_token: options.token,
@@ -417,8 +415,9 @@ function buildAudienceQuery(options) {
     let query = 'metrics={metric}&'
     query += buildQueryString(queryObj)
 
-    const breakdowns = options.breakdowns;
+    let breakdowns = options.breakdowns
     if ( breakdowns && breakdowns.length ) {
+        breakdowns = breakdowns.join()
         query += `&breakdowns=${breakdowns}`
     }
 
@@ -434,4 +433,16 @@ function buildQueryString(queryObj) {
     return Object.keys(queryObj).map(key => {
         return `${key}=${queryObj[key]}`
     }).join('&')
+}
+
+/**
+ * Compute the starting limit of the query
+ * @param pastDays
+ * @returns {number}
+ */
+function getSince(pastDays) {
+    let since = new Date();
+    since = since.setDate( since.getDate() - pastDays )
+    // fb ask for timestamp in seconds
+    return Math.round( since / 1000 );
 }

@@ -3,6 +3,7 @@ var request = require( "request" );
 var sinon = require( "sinon" );
 var Promise = require( "bluebird" );
 const queryString = require('querystring')
+const moment = require( 'moment' )
 var FacebookInsightStream = require( "./index" );
 
 var BASEURL = "https://graph.facebook.com/";
@@ -255,47 +256,97 @@ describe( 'Multiple access tokens', function () {
 
 })
 
-describe( 'Audience API requests', function () {
+describe( 'API requests', function () {
     const sandbox = sinon.sandbox.create()
-    const metrics = [
-        'fb_ad_network_request',
-        'fb_ad_network_imp',
-    ]
-    var source = {
-        apps: [{id: 'myApp1', token: 'tok1'}],
-    }
-    const options = {
-        apps: [ 'myApp' ],
-        node: 'audience',
-        pastdays: 7,
-        period: 'daily',
-        metrics: metrics,
-        aggregate: 'DAY',
-        breakdowns: "['placement','country']",
-        itemList: source.apps,
-        limit: 'someLimit',
-        token: 'someToken',
-    }
-    let stream
-    beforeEach(() => {
-        stream = new FacebookInsightStream( options )
-    })
     afterEach(() => {
         sandbox.restore()
     })
 
-    it( 'build Audience url', function(done) {
-        const startExpected = `https://graph.facebook.com/v2.12/`
-            + `{id}/adnetworkanalytics?metrics={metric}`
-        const endExpected = `access_token=someToken&aggregation_period=DAY&`
-            + `limit=someLimit&breakdowns=['placement','country']`
-        let initItemStub = sandbox.stub(stream, '_initItem').callsFake(item => {
-            return Promise.resolve()
-        })
+    it( 'build general url', function(done) {
+        const metrics = [
+            'fb_ad_network_request',
+            'fb_ad_network_imp',
+        ]
+        var source = {
+            apps: [{id: 'myApp1', token: 'tok1'}],
+        }
+        const options = {
+            pastdays: 30,
+            node: source.node || 'app',
+            period: "daily",
+            metrics: METRICS,
+            itemList: source.apps,
+            ignoreMissing: source.ignoreMissing
+        }
+
+        const stream = new FacebookInsightStream( options )
+
+        let initItemStub = sandbox.stub(stream, '_initItem')
+            .callsFake(() => {})
+
+        let since = new Date()
+        since = since.setDate(since.getDate() - options.pastdays)
+        let until = Date.now()
+
+        // fb ask for timestamp in seconds
+        until = Math.round( until / 1000 );
+        since = Math.round( since / 1000 );
+
+        const expectedURL = [
+            `https://graph.facebook.com/v2.12/{id}/app_insights`,
+            `/{metric}?since=${since}&until=${until}&period=daily`,
+            `&access_token=undefined&event_name=&aggregateBy=`
+        ] .join('')
+
 
         let  _callback = function () {
-            assert(stream.url.startsWith(startExpected))
-            assert(stream.url.endsWith(endExpected))
+            assert.equal(stream.url, expectedURL)
+            done()
+        }
+
+        return stream._init(_callback)
+    })
+
+    it( 'build Audience url', function(done) {
+        const metrics = [
+            'fb_ad_network_request',
+            'fb_ad_network_imp',
+        ]
+        var source = {
+            apps: [{id: 'myApp1', token: 'tok1'}],
+        }
+        const options = {
+            apps: [ 'myApp' ],
+            node: 'audience',
+            pastdays: 7,
+            period: 'daily',
+            metrics: metrics,
+            aggregate: 'DAY',
+            breakdowns: ['breakdowns1','breakdowns2'],
+            itemList: source.apps,
+            limit: 'someLimit',
+            token: 'someToken',
+        }
+
+        const stream = new FacebookInsightStream( options )
+
+        let initItemStub = sandbox.stub(stream, '_initItem')
+            .callsFake(()=> {})
+
+        const since = moment().subtract(options.pastdays, 'd')
+            .format('YYYY-MM-DD')
+        const until = new Date().toISOString()
+            .split('T')[0]
+
+        const expectedURL = [
+            `https://graph.facebook.com/v2.12/{id}/adnetworkanalytics`,
+            `?metrics={metric}&since=${since}&until=${until}&period=daily`,
+            `&access_token=someToken&aggregation_period=DAY`,
+            `&limit=someLimit&breakdowns=breakdowns1,breakdowns2`
+        ] .join('')
+
+        let  _callback = function () {
+            assert.equal(stream.url, expectedURL)
             done()
         }
 
