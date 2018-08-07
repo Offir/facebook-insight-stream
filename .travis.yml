@@ -1,0 +1,11 @@
+branches:
+  only:
+    - master
+
+language: node_js
+node_js:
+  - "6.10.1"
+
+# Each step below must succeed for the build to pass
+script:
+    - npm test
