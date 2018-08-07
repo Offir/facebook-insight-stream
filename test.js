@@ -340,9 +340,9 @@ describe( 'API requests', function () {
 
         const expectedURL = [
             `https://graph.facebook.com/v2.12/{id}/adnetworkanalytics`,
-            `?metrics={metric}&since=${since}&until=${until}&period=daily`,
-            `&access_token=someToken&aggregation_period=DAY`,
-            `&limit=someLimit&breakdowns=breakdowns1,breakdowns2`
+            `?metrics={metric}&since=${since}&until=${until}`,
+            `&access_token=someToken&limit=someLimit&aggregation_period=DAY`,
+            `&breakdowns=breakdowns1,breakdowns2`
         ] .join('')
 
         let  _callback = function () {

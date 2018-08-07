@@ -406,10 +406,15 @@ function buildAudienceQuery(options) {
     let queryObj = {
         since: since,
         until: until,
-        period: options.period,
         access_token: options.token,
-        aggregation_period: options.aggregate,
-        limit: options.limit
+    }
+
+    if (options.limit) {
+        queryObj.limit = options.limit
+    }
+
+    if (options.aggregate) {
+        queryObj.aggregation_period = options.aggregate
     }
 
     let query = 'metrics={metric}&'
