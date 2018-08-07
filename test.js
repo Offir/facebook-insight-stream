@@ -276,13 +276,13 @@ describe( 'API requests', function () {
             period: "daily",
             metrics: METRICS,
             itemList: source.apps,
-            ignoreMissing: source.ignoreMissing
+            ignoreMissing: source.ignoreMissing,
+            breakdowns: ['breakdowns1','breakdowns2']
         }
 
-        const stream = new FacebookInsightStream( options )
+        const stream = new FacebookInsightStream(options)
 
-        let initItemStub = sandbox.stub(stream, '_initItem')
-            .callsFake(() => {})
+        sandbox.stub(stream, '_initItem').callsFake(() => {})
 
         let since = new Date()
         since = since.setDate(since.getDate() - options.pastdays)
@@ -295,7 +295,8 @@ describe( 'API requests', function () {
         const expectedURL = [
             `https://graph.facebook.com/v2.12/{id}/app_insights`,
             `/{metric}?since=${since}&until=${until}&period=daily`,
-            `&access_token=undefined&event_name=&aggregateBy=`
+            `&access_token=undefined&event_name=&aggregateBy=`,
+            `&breakdowns[0]=breakdowns1&breakdowns[1]=breakdowns2`
         ] .join('')
 
 
@@ -330,8 +331,7 @@ describe( 'API requests', function () {
 
         const stream = new FacebookInsightStream( options )
 
-        let initItemStub = sandbox.stub(stream, '_initItem')
-            .callsFake(()=> {})
+        sandbox.stub(stream, '_initItem').callsFake(()=> {})
 
         const since = moment().subtract(options.pastdays, 'd')
             .format('YYYY-MM-DD')
